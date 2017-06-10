@@ -1,128 +1,61 @@
-# sum of all distances to medoid 
-# of elements inside cluster
-calculateCost <- function(medoid, cluster, distMethod) {
-	totalDistance <- 0
-	for(elem in cluster) {
-		distance <- dist(rbind(elem, medoid), method=distMethod)
-		totalDistance <- totalDistance + distance
-	}
-	return(totalDistance)
+assignDataToMedoids <- function(data, medoids, metric) {
+	apply(data, 1, function(x) {
+		distances <- apply(medoids, 1, 
+			function(medoid) dist(rbind(x, medoid), method=metric))
+		which.min(distances)	
+	})
 }
 
-kMedoidsClustering <- function(gaPopulation, distMethod, clustersSize) {
-	# initialize clusters
-	clusters <- vector("list", clustersSize)
-	for(i in 1:clustersSize) {
-		cluster <- list()
-		clusters[[i]] <- cluster
-	}
+kMedoidsClustering <- function(data, nclusters, metric) {
+	clustering <- rep(0, nrow(data))
+	medoidsIdxs <- sample(1:nrow(data), nclusters)
 
-	# get initial random medoids
-	# and remove them from gaPopulation
-	medoids <- vector("list", clustersSize)
-	set.seed(customSeed)
-	idxs <- sample(1:popSize, clustersSize)
-	for(i in 1:clustersSize) {
-		idx <- idxs[i]
-		medoid <- gaPopulation[idx,]
-		medoids[[i]] <- medoid
-	}
-	gaPopulation <- gaPopulation[-idxs,]
+	repeat {
+		medoids <- data[medoidsIdxs, ]
 
-	# convert gaPopulation (represented by a matrix)
-	# into population variable (represented by list)
-	restPopSize <- popSize - clustersSize
-	population <- vector("list", restPopSize)
-	for(idx in 1:restPopSize) {
-		elem <- gaPopulation[idx,]
-		population[[idx]] <- elem
-	}
+		restIdxs <- (1:nrow(data))[-medoidsIdxs]
+		restData <- data[restIdxs, ]
+		restClustering <- assignDataToMedoids(restData, medoids, metric)
 
-	# main algorithm loop
-	while(1) {
-		# assign elements of population into clusters
-		for(elem in population) {
-			# find the nearest medoid
-			minDistance <- Inf
-			minDistanceIdx <- -1
-			for(i in 1:clustersSize) {
-				medoid <- medoids[[i]]
-				distance <- dist(rbind(elem, medoid), method=distMethod)
-				if(distance < minDistance) {
-					minDistance <- distance
-					minDistanceIdx <- i
-				}
-			}
+		clustering[restIdxs] <- restClustering
+		clustering[medoidsIdxs] <- 1:nclusters # always the same
 
-			# push elem to nearest cluster
-			cluster <- clusters[[minDistanceIdx]]
-			clusters[[minDistanceIdx]] <- c(cluster, list(elem))
-		}
+		# for each cluster find best medoid
+		newMedoidsIdxs <- sapply(1:nclusters, function(cluster) {
+			# get elements assigned to cluster
+			clusteredIdxs <- which(clustering == cluster)
+			nclustered <- length(clusteredIdxs)
 
-		# for each cluster find better medoid
-		wasChanged <- FALSE
-		for(i in 1:clustersSize) {
-			cluster <- clusters[[i]]
+			# if cluster is empty - only medoid - return index to it
+			if(nclustered == 1)
+				return(clusteredIdxs[1])
 
-			# if cluster is empty, nothing to find
-			if(length(cluster) == 0) {
-				next 
-			}
+			# calculate costs for each cluster
+			costs <- sapply(1:nclustered, function(idx) {
+				medoid <- data[clusteredIdxs[idx], ]	
+				clusterData <- data[clusteredIdxs[-idx], ]
 
-			medoid <- medoids[[i]]
-			currentCost <- calculateCost(medoid, cluster, distMethod)
-
-			# by replacing each cluster elem with medoid
-			# find the lowest cost from all configurations
-			minCost <- Inf
-			minCostIdx <- -1
-			for(j in 1:length(cluster)) {
-				# swap medoid with j-th cluster's elem
-				newMedoid <- cluster[[j]]
-				cluster[[j]] <- medoid
-				medoid <- newMedoid
-
-				# check, if the cost was reduced
-				cost <- calculateCost(medoid, cluster, distMethod)
-				if(cost < minCost) {
-					minCost <- cost
-					minCostIdx <- j
+				if(!length(dim(clusterData))) { # if there is only one element
+					distance <- dist(rbind(clusterData, medoid), method=metric)
+					distances <- c(distance)
+				} else {
+					distances <- apply(clusterData, 1, 
+						function(x) dist(rbind(x, medoid), method=metric))
 				}
 
-				# undo the swap
-				oldMedoid <- cluster[[j]]
-				cluster[[j]] <- medoid
-				medoid <- oldMedoid
-			}
+				cost <- sum(distances)
+			})
 
-			# if best found configuration is better than current
-			if(minCost < currentCost) {
-				# swap best elem with current medoid
-				bestElem <- cluster[[minCostIdx]]
-				cluster[[minCostIdx]] <- medoids[[i]]
-				medoids[[i]] <- bestElem
-				clusters[[i]] <- cluster
-				wasChanged <- TRUE
-			}
-		}
+			clusteredIdxs[which.min(costs)]
+		})
 
-		# check, if elements can be assigned to other medoids
-		# but if there was no changes inside clusters, end algorithm
-		if(!wasChanged)
-			break
-
-		# unpack all elements from clusters into population variable
-		population <- vector("list", restPopSize)
-		idx <- 1
-		for(k in 1:clustersSize) {
-			cluster <- clusters[[k]]
-			if(length(cluster) != 0) {
-				population[idx:(length(cluster)+idx-1)] <- cluster
-				idx <- idx + length(cluster)
-				clusters[[k]] <- list()
-			}
-		}
+		if(all(medoidsIdxs == newMedoidsIdxs))
+			break;
+			
+		medoidsIdxs <- newMedoidsIdxs
 	}
 
-	return(list("clusters" = clusters, "medoids" = medoids))
+	medoids <- data[medoidsIdxs, ]
+
+	return(list("medoids"=medoids, "clustering"=clustering))
 }

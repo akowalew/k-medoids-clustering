@@ -3,14 +3,10 @@ rm(list=ls())
 
 library("GA")
 library("cec2013")
-# library("doParallel")
-# library("parallel")
-# library("foreach")
-# library("iterators")
-
+library("parallel")
 source("k-medoids-clustering.R")
 
-functionNumber <- 5
+functionNumber <- 7
 targetFunction <- function(x) {
 	cec2013(functionNumber, x)
 }
@@ -30,13 +26,14 @@ runGA <- function(D, popSize, left, right, fitnessFunction) {
 			fitness=fitnessFunction,
 			min=rep(left, D),
 			max=rep(right, D),
-			maxiter=9999999,
-			maxFitness=999,
+			maxiter=999999,
+			maxFitness=799.9,
 			popSize=popSize,
 			# pcrossover=0.8,
 			# pmutation=0.1,
-			# parallel=FALSE,
-			seed=12345
+			parallel=FALSE,
+			optim=TRUE
+			#seed=12345
 			# elitism=base::max(1, round(popSize*0.05))
 			)
 		save(GA, file=fileName);
@@ -213,17 +210,17 @@ showTest1 <- function(D, left, right, customSeed) {
 	}
 }
 
+# startTesting <- function(D) {
+# 	# D <- 2
+# 	left <- -100
+# 	right <- 100
+# 	customSeed <- 1234
+# 	# showTest1(D, left, right, customSeed)
 
-D <- 10
-left <- -100
-right <- 100
-customSeed <- 1234
-# showTest1(D, left, right, customSeed)
-
-popSize <- 100
-
-dimensions <- c(10, 30, 50)
-for(D in dimensions) {
-	GA <- runGA(D, popSize, left, right, fitnessFunction)
-}
-
+# 	popSize <- 100
+# 	# dimensions <- c(10, 30, 50)
+# 	# for(D in dimensions) {
+# 		GA <- runGA(D, popSize, left, right, fitnessFunction)
+# 	# }
+# 	return(GA)
+# }
