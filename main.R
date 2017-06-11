@@ -1,43 +1,43 @@
+# 	main.R
+# Entry point of solution
+# Runs scripts from analysis.R
+#
+# Author: akowalew
+
 rm(list=ls())
-# graphics.off()
+graphics.off()
 
-library("GA")
-library("cec2013")
-library("parallel")
-source("k-medoids-clustering.R")
+set.seed(1234)
 
-functionNumber <- 7
-targetFunction <- function(x) {
-	cec2013(functionNumber, x)
-}
+source("analysis.R")
+source("data-loading.R")
+load("cec2013_5_2_50_-100_100")
 
-fitnessFunction <- function(x) {
-	-targetFunction(x)
-}
+# # normal check
+# data <- GA@population
+# nclusters <- 5
+# metric <- "euclidean"
+# r <- doClustering(GA@population, nclusters, metric)
 
-runGA <- function(D, popSize, left, right, fitnessFunction) {
-	fileName <- paste("cec2013", functionNumber, D, popSize, left, right, sep="_")
-	if(file.exists(fileName)) {
-		print(paste("File with name:", fileName, "exists. Loading it..."))
-		load(fileName)
-	} else {
-		print(paste("File with name:", fileName, "doesn't exists. Generating population..."))
-		GA <- ga(type="real-valued",
-			fitness=fitnessFunction,
-			min=rep(left, D),
-			max=rep(right, D),
-			maxiter=999999,
-			maxFitness=799.9,
-			popSize=popSize,
-			# pcrossover=0.8,
-			# pmutation=0.1,
-			parallel=FALSE,
-			optim=TRUE
-			#seed=12345
-			# elitism=base::max(1, round(popSize*0.05))
-			)
-		save(GA, file=fileName);
-		print("Saved generated population!")
-	}
-	return(GA)
-}
+# check all cases
+fnumbers <- c(5, 6, 14)
+dimensions <- c(10, 30, 50)
+nnclusters <- c(3, 5)
+metrics <- c("euclidean", "manhattan")
+
+results <- lapply(fnumbers, function(fnumber) {
+	lapply(dimensions, function(dimension) {
+		population <- getPopulation(dimension, fnumber)
+		if(is.null(population))
+			return(NULL)
+
+		lapply(nnclusters, function(nclusters) {
+			lapply(metrics, function(metric) {
+				result <- doClustering(population, nclusters, metric)
+				result$data <- population
+				return(result)
+			})	
+		})
+	})
+})
+save(results, file='k-medoids-results')
